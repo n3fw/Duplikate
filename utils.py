@@ -88,11 +88,11 @@ class Folder:
     
     def det_images(self):
         for i in self.__content:
-            f = File(self.__path + "/" + i)
-            if f.exists() and f.is_image():
+            f = File( (self.__path if self.__path != None else "") + "/" + i)
+            if f.is_image():
                 self.__images.append(f)
 
-    def check_dup(self, ind: int) -> list[int]:
+    def check_by_pix(self, ind: int) -> list[int]:
         duplicates = []
         im_data = self.__images[ind]
         im_data.size_get()
@@ -111,6 +111,18 @@ class Folder:
                     print("image", i, "is not a duplicate")
         return duplicates
     
+    def gndc(self, data1: File, data2: File) -> tuple[int, int, int, int, 1|2, 1|2]:
+        data1.size_get()
+        data2.size_get()
+        size1 = data1.ret_size()
+        size2 = data2.ret_size()
+        divx = max(size1[0], size2[0]) // min(size1[0], size2[0])
+        rx = max(size1[0], size2[0]) % min(size1[0], size2[0])
+        divy = max(size1[1], size2[1]) // min(size1[1], size2[1])
+        ry = max(size1[1], size2[1]) % min(size1[1], size2[1])
+        return (divx, divy, rx, ry, 1 if max(size1[0], size2[0]) == size1[0] else 2, 1 if max(size1[1], size2[1]) == size1[1] else 2)
+
+
     def reduce_im(self):
         self.__images.pop(0)
 
@@ -181,12 +193,12 @@ class RunApp:
     def get_path(self):
         self.folder = Folder(self.ui.start_menu())
     
-    def run(self):
+    def pixel_by_pixel(self):
         self.folder.get_content()
         self.folder.det_images()
         numb_im = len(self.folder.ret_images()) - 1
         while numb_im != 0:
-            dups = self.folder.check_dup(0)
+            dups = self.folder.check_by_pix(0)
             for i in range(len(dups)):
                 self.ui.comp_wind(self.folder.ret_images()[0].ret_name(), dups[i].ret_name())
                 if self.ui.action_id == 1:
@@ -195,7 +207,31 @@ class RunApp:
                     print("not a duplicate")
             numb_im -= 1
             self.folder.reduce_im()
+    
+    def run(self):
+        dups = []
+        self.folder.get_content()
+        self.folder.det_images()
+        if self.folder.ret_images() == []:
+            exit()
+        images = self.folder.ret_images()
+        compt = 0
+        ref = len(images)
+        while compt != ref:
+            for i in range(0, len(images)):
+                if i != compt:
+                    if self.folder.convulation(images[compt], images[i]):
+                        dups.append(images[i])
+            compt += 1
+            self.folder.reduce_im()
+            for j in dups:
+                self.ui.comp_wind(images[compt].ret_name(), dups[j].ret_name())
+                if self.ui.action_id == 1:
+                    None
+                else:
+                    None
 
-tst = RunApp()
-tst.get_path()
-tst.run()
+tst = Folder("C:/Users/quent/Documents/projects/Duplikate")
+tst.get_content()
+tst.det_images()
+print(tst.gndc(tst.ret_images()[0], tst.ret_images()[1]))
