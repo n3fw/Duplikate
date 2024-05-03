@@ -112,6 +112,14 @@ class Folder:
         return duplicates
     
     def gndc(self, data1: File, data2: File) -> tuple[int, int, int, int, 1|2, 1|2]:
+        """
+        determines the size of kernels for convolution
+        :returns a tuple
+        :last two elements of tuple are which image is the bigger in x and y respectively. 
+
+        check up for an existing image given as argument needed to be done before.
+        see documentation for more info. 
+        """
         data1.size_get()
         data2.size_get()
         size1 = data1.ret_size()
@@ -122,6 +130,44 @@ class Folder:
         ry = max(size1[1], size2[1]) % min(size1[1], size2[1])
         return (divx, divy, rx, ry, 1 if max(size1[0], size2[0]) == size1[0] else 2, 1 if max(size1[1], size2[1]) == size1[1] else 2)
 
+    def sum_of_t(self, t1, t2):
+        return (t1[0] + t2[0], t1[1] + t2[1], t1[2] + t2[2])
+
+    def convolution(self, prop: tuple[int, int, int, int, int, int], img1: File):
+        """
+        prop structure:
+        :0 -> size of kernel in x
+        :1 -> size of kernel in y
+        :2 -> rest of pixels to dispatch in x
+        :3 -> rest of pixels to dispatch in y
+        :4 -> number of kernel by ligne (x)
+        :5 -> number of kernel by column (y)
+
+        returns a dim2 list of kernels. determines the amount of kernel to do according
+        to the gndc. takes into account the rest of pixel that couldn't fit in the kernels. 
+        makes the first kernels slightly bigger for this matter. 
+        Calculations for which dimensions to use for kernel list to do apart. 
+        assumes the image given needs to add the rest that couldn't fit as part
+        of the kernels as the correct one. if the image used is the smaller of the duo,
+        don't forget to mark both x/y rests are 0. 
+
+        see documentation for more info. 
+        """
+        img1.pixel_list()
+        tabpix1 = img1.ret_pixels()
+        conv = [[] for i in range(0, prop[5], prop[1])]
+        compx, compy = 0, 0
+        for i in range(0, prop[5], prop[1]):
+            for j in range(0, prop[4], prop[0]):
+                group = 0
+                if i + prop[1] - 1 + (1 if prop[3] != compy else 0) < img1.ret_size()[1] and i + prop[0] - 1 + (1 if prop[2] != compx else 0) < img1.ret_size()[0]:
+                    for k in range(prop[1] + (1 if prop[3] != compy else 0)):
+                        for l in range(prop[0] + (1 if prop[2] != compx else 0)):
+                            group += tabpix1[i + k][j + l]
+                    conv[i // prop[1]].append(round(group, 2))
+                    compx += 1
+                    compy += 1
+        return conv
 
     def reduce_im(self):
         self.__images.pop(0)
@@ -220,7 +266,7 @@ class RunApp:
         while compt != ref:
             for i in range(0, len(images)):
                 if i != compt:
-                    if self.folder.convulation(images[compt], images[i]):
+                    if self.folder.convolution(images[compt], images[i]):
                         dups.append(images[i])
             compt += 1
             self.folder.reduce_im()
@@ -231,7 +277,3 @@ class RunApp:
                 else:
                     None
 
-tst = Folder("C:/Users/quent/Documents/projects/Duplikate")
-tst.get_content()
-tst.det_images()
-print(tst.gndc(tst.ret_images()[0], tst.ret_images()[1]))
