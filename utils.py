@@ -61,7 +61,7 @@ class File:
         for x in range(self.__size[0]):
             for y in range(self.__size[1]):
                 pix = img.getpixel((x, y))
-                self.__pixels[x][y] = (pix[0] + pix[1] + pix[2]) / 3
+                self.__pixels[x][y] = pix
             
 class Folder:
     def __init__(self, path: str | None = None) -> None:
@@ -110,67 +110,53 @@ class Folder:
                 else:
                     print("image", i, "is not a duplicate")
         return duplicates
-    
-    def gndc(self, data1: File, data2: File) -> tuple[int, int, int, int, 1|2, 1|2]:
-        """
-        determines the size of kernels for convolution
-        :returns a tuple
-        :last two elements of tuple are which image is the bigger in x and y respectively. 
-
-        check up for an existing image given as argument needed to be done before.
-        see documentation for more info. 
-        """
-        data1.size_get()
-        data2.size_get()
-        size1 = data1.ret_size()
-        size2 = data2.ret_size()
-        divx = max(size1[0], size2[0]) // min(size1[0], size2[0])
-        rx = max(size1[0], size2[0]) % min(size1[0], size2[0])
-        divy = max(size1[1], size2[1]) // min(size1[1], size2[1])
-        ry = max(size1[1], size2[1]) % min(size1[1], size2[1])
-        return (divx, divy, rx, ry, 1 if max(size1[0], size2[0]) == size1[0] else 2, 1 if max(size1[1], size2[1]) == size1[1] else 2)
 
     def sum_of_t(self, t1, t2):
         return (t1[0] + t2[0], t1[1] + t2[1], t1[2] + t2[2])
 
-    def convolution(self, prop: tuple[int, int, int, int, int, int], img1: File):
-        """
-        prop structure:
-        :0 -> size of kernel in x
-        :1 -> size of kernel in y
-        :2 -> rest of pixels to dispatch in x
-        :3 -> rest of pixels to dispatch in y
-        :4 -> number of kernel by ligne (x)
-        :5 -> number of kernel by column (y)
-
-        returns a dim2 list of kernels. determines the amount of kernel to do according
-        to the gndc. takes into account the rest of pixel that couldn't fit in the kernels. 
-        makes the first kernels slightly bigger for this matter. 
-        Calculations for which dimensions to use for kernel list to do apart. 
-        assumes the image given needs to add the rest that couldn't fit as part
-        of the kernels as the correct one. if the image used is the smaller of the duo,
-        don't forget to mark both x/y rests are 0. 
-
-        see documentation for more info. 
-        """
+    def convolution(self, img1: File):
         img1.pixel_list()
-        tabpix1 = img1.ret_pixels()
-        conv = [[] for i in range(0, prop[5], prop[1])]
-        compx, compy = 0, 0
-        for i in range(0, prop[5], prop[1]):
-            for j in range(0, prop[4], prop[0]):
-                group = 0
-                if i + prop[1] - 1 + (1 if prop[3] != compy else 0) < img1.ret_size()[1] and i + prop[0] - 1 + (1 if prop[2] != compx else 0) < img1.ret_size()[0]:
-                    for k in range(prop[1] + (1 if prop[3] != compy else 0)):
-                        for l in range(prop[0] + (1 if prop[2] != compx else 0)):
-                            group += tabpix1[i + k][j + l]
-                    conv[i // prop[1]].append(round(group, 2))
-                    compx += 1
-                    compy += 1
+        tabpix = img1.ret_pixels()
+        conv = [[] for i in range(0, h, 2)]
+        w, h = img1.ret_size()
+        for i in range(0, h, 2):
+            for j in range(0, w, 2):
+                ker = (0, 0, 0)
+                if i < h - 1 and j < w - 1:
+                    ker = self.sum_of_t(ker, tabpix[i][j])
+                    ker = self.sum_of_t(ker, tabpix[i][j+1])
+                    ker = self.sum_of_t(ker, tabpix[i+1][j])
+                    ker = self.sum_of_t(ker, tabpix[i+1][j+1])
+                    conv[i].append(ker)
         return conv
 
     def reduce_im(self):
         self.__images.pop(0)
+    
+    def accurate_find(self, img1: File, img2: File):
+        res: bool = False
+        conv1 = self.convolution(img1)
+        conv2 = self.convolution(img2)
+
+        if (img1.ret_size() == img2.ret_size()):
+            #add calculations of differences between lists
+            None
+        else:
+            r1, g1, b1, r2, g2, b2 = 0, 0, 0, 0, 0, 0
+            for i in range(0, len(conv1)):
+                for j in range(0, len(conv1[i])):
+                    r1 += conv1[i][j][0]
+                    g1 += conv1[i][j][1]
+                    b1 += conv1[i][j][2]
+            for i in range(0, len(conv2)):
+                for j in range(len(conv2[i])):
+                    r2 += conv2[i][j][0]
+                    g2 += conv2[i][j][1]
+                    b2 += conv2[i][j][2]
+            difR, difB, difG = (r2 - r1)/r1*100, (b2 - b1)/b1*100, (g2 - g1)/g1*100
+            if -1.0 < difR < 1.0 and -1.0 < difB < 1.0 and -1.0 < difG < 1.0:
+                res = True
+        return res
 
 class UI:
     def __init__(self):
@@ -266,6 +252,8 @@ class RunApp:
         while compt != ref:
             for i in range(0, len(images)):
                 if i != compt:
+                    images[compt].size_get()
+                    images[i].size_get()
                     if self.folder.convolution(images[compt], images[i]):
                         dups.append(images[i])
             compt += 1
@@ -277,3 +265,9 @@ class RunApp:
                 else:
                     None
 
+tst = Folder()
+
+i1 = File("hooh.png")
+i2 = File("zzz.png")
+
+tst.accurate_find(i1, i2)
