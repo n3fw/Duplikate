@@ -4,6 +4,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog
 import ctypes as ct
+from math import log2, ceil
 
 class File:
     def __init__(self, name: str) -> None:
@@ -338,12 +339,21 @@ class RunApp:
                     print("not a duplicate")
             numb_im -= 1
             self.folder.reduce_im()
+        
+    def progression(self):
+        """
+        :returns an approximate number of operations to complete in order to work on a folder
+        """
+        return ceil(len(self.folder.ret_content())*log2(self.folder.ret_content() - 1))
     
     def run(self):
         self.get_path()
         self.folder.get_content()
         self.folder.det_images()
+        total = self.progression()
+        compt = 1
         if self.folder.ret_images() == []:
+            ct.windll.user32.MessageBoxW(0, "No images found in the given folder !", "Error", 0)
             exit()
         images = self.folder.ret_images()
         while len(images) != 0:
@@ -352,10 +362,11 @@ class RunApp:
                 convu = self.folder.convolution(images[0])
                 dups = []
                 for i in range(1, len(images)):
-                    print(images[0].ret_name())
+                    print("treating comparison " + f"{compt}" + " out of " + f"{total}")
                     images[i].size_get()
                     if self.folder.accurate_find(conv1 = convu, conv2 = self.folder.convolution(images[i]), img1 = images[0], img2 = images[i]):
                         dups.append(images[i])
+                    compt += 1
 
                 if len(images) != 0:
                     for j in dups:
