@@ -23,13 +23,15 @@ class File:
     
     def exists(self) -> bool:
         """
-        checks if file exists
+        checks if file exists \n
+        supported error in case of not existing : \n
+        FileNotFoundError, FileExistsError, UnidentifiedImageError
 
         :return true if yes, false else
         """
         try:
             file = Image.open(self.__name)
-        except UnidentifiedImageError:
+        except FileNotFoundError or FileExistsError or UnidentifiedImageError:
             return False
         return True
     
@@ -56,6 +58,7 @@ class File:
         """
         changes self.__pixels to the list of average RGB byte value of every pixel in the image
         """
+        self.size_get()
         img = Image.open(self.__name)
         self.__pixels = [ [0 for i in range(self.__size[1])] for j in range(self.__size[0]) ]
         for x in range(self.__size[0]):
@@ -75,6 +78,9 @@ class Folder:
     def ret_images(self):
         return self.__images
     
+    def ret_path(self):
+        return self.__path
+    
     def get_content(self) -> None:
         """
         gets all files in the specified directory
@@ -87,12 +93,22 @@ class Folder:
             self.__content = os.listdir(self.__path)
     
     def det_images(self):
+        """
+        uses self.__content to determine self.__images 
+
+        :returns nothing, modifies self.__images
+        """
         for i in self.__content:
             f = File( (self.__path if self.__path != None else "") + "/" + i)
             if f.is_image():
                 self.__images.append(f)
 
     def check_by_pix(self, ind: int) -> list[int]:
+        """
+        unused method for checking same images 
+
+        :returns a list of duplicate images (not optimized)
+        """
         duplicates = []
         im_data = self.__images[ind]
         im_data.size_get()
@@ -115,46 +131,113 @@ class Folder:
         return (t1[0] + t2[0], t1[1] + t2[1], t1[2] + t2[2])
 
     def convolution(self, img1: File):
+        """
+        creates a dim2 list of kernels -> for convolution
+
+        :returns list
+        :takes a File as an argument
+        """
         img1.pixel_list()
         tabpix = img1.ret_pixels()
-        conv = [[] for i in range(0, h, 2)]
         w, h = img1.ret_size()
+        conv = [[] for i in range(0, h, 2)]
         for i in range(0, h, 2):
             for j in range(0, w, 2):
                 ker = (0, 0, 0)
-                if i < h - 1 and j < w - 1:
-                    ker = self.sum_of_t(ker, tabpix[i][j])
-                    ker = self.sum_of_t(ker, tabpix[i][j+1])
-                    ker = self.sum_of_t(ker, tabpix[i+1][j])
-                    ker = self.sum_of_t(ker, tabpix[i+1][j+1])
-                    conv[i].append(ker)
+                nbpi = 0
+                if i < h - 2 and j < w - 2:
+                    try:
+                        val = tabpix[i][j]
+                    except IndexError:
+                        pass
+                    else:
+                        nbpi += 1
+                        ker = self.sum_of_t(ker, tabpix[i][j])
+                    try:
+                        val = tabpix[i][j+1]
+                    except IndexError:
+                        pass
+                    else:
+                        nbpi += 1
+                        ker = self.sum_of_t(ker, tabpix[i][j+1])
+                    try:
+                        val = tabpix[i+1][j]
+                    except IndexError:
+                        pass
+                    else:
+                        nbpi += 1
+                        ker = self.sum_of_t(ker, tabpix[i+1][j])
+                    try:
+                        val = tabpix[i+1][j+1]
+                    except IndexError:
+                        pass
+                    else:
+                        nbpi +=1
+                        ker = self.sum_of_t(ker, tabpix[i+1][j+1])
+                    if nbpi != 0:
+                        ker = (ker[0] / nbpi, ker[1] / nbpi, ker[2] / nbpi)
+                    conv[int(i/2)].append(ker)
         return conv
 
     def reduce_im(self):
         self.__images.pop(0)
     
-    def accurate_find(self, img1: File, img2: File):
-        res: bool = False
-        conv1 = self.convolution(img1)
-        conv2 = self.convolution(img2)
+    def accurate_find(self, conv1: list, conv2: list, img1: File, img2: File):
+        """
+        determines if two images are the same or not  \n
+        two cases -> same size or different sizes
+        (approximated accuracy : 98.98% / set accuracy : 95% (can be changed))
 
+        :returns true if detected same, false else
+        """
+        res: bool = False
         if (img1.ret_size() == img2.ret_size()):
-            #add calculations of differences between lists
-            None
-        else:
+            dif0, dif1, dif2 = 0, 0, 0
+            for i in range (len(conv1)):
+                for j in range (len(conv1[i])):
+                    if conv1[i][j][0] == 0 and conv2[i][j][0] != 0:
+                        dif0 += 1
+                    elif conv1[i][j][0] == conv2[i][j][0] == 0:
+                        pass
+                    else:
+                        dif0 += (conv2[i][j][0] - conv1[i][j][0]) / conv1[i][j][0]
+                    if conv1[i][j][1] == 0 and conv2[i][j][1]:
+                        dif1 +=1
+                    elif  conv1[i][j][1] == conv2[i][j][1] == 0:
+                        pass
+                    else:
+                        dif1 += (conv2[i][j][1] - conv1[i][j][1]) / conv1[i][j][1]
+                    if conv1[i][j][2] == 0 and conv2[i][j][2]:
+                        dif2 += 1
+                    elif  conv1[i][j][2] == conv2[i][j][2] == 0:
+                        pass
+                    else:
+                        dif2 += (conv2[i][j][2] - conv1[i][j][2]) / conv1[i][j][2]
+            dif0 = (dif0 / ( len(conv1) * len(conv1[0]) ) ) * 100
+            dif1 = (dif1 / ( len(conv1) * len(conv1[0]) ) ) * 100
+            dif2 = (dif2 / ( len(conv1) * len(conv1[0]) ) ) * 100
+            if -5.0 < dif0 < 5.0 and -5.0 < dif1 < 5.0 and -5.0 < dif2 < 5.0:
+                res = True
+        else:    
             r1, g1, b1, r2, g2, b2 = 0, 0, 0, 0, 0, 0
             for i in range(0, len(conv1)):
                 for j in range(0, len(conv1[i])):
                     r1 += conv1[i][j][0]
                     g1 += conv1[i][j][1]
                     b1 += conv1[i][j][2]
+            r1 = r1 / (len(conv1) * len(conv1[0]))
+            g1 = g1 / (len(conv1) * len(conv1[0]))
+            b1 = b1 / (len(conv1) * len(conv1[0]))
             for i in range(0, len(conv2)):
                 for j in range(len(conv2[i])):
                     r2 += conv2[i][j][0]
                     g2 += conv2[i][j][1]
                     b2 += conv2[i][j][2]
+            r2 = r2 / (len(conv2) * len(conv2[0]))
+            g2 = g2 / (len(conv2) * len(conv2[0]))
+            b2 = b2 / (len(conv2) * len(conv2[0]))
             difR, difB, difG = (r2 - r1)/r1*100, (b2 - b1)/b1*100, (g2 - g1)/g1*100
-            if -1.0 < difR < 1.0 and -1.0 < difB < 1.0 and -1.0 < difG < 1.0:
+            if -5.0 < difR < 5.0 and -5.0 < difB < 5.0 and -5.0 < difG < 5.0:
                 res = True
         return res
 
@@ -162,6 +245,17 @@ class UI:
     def __init__(self):
         self.wind = None
         self.action_id = None
+
+    def find_logo(self) -> str:
+        """
+        find logo if present, else logo is base tk
+        """
+        try:
+            os.open("resources/main_logo.ico", os.O_RDONLY)
+        except FileNotFoundError:
+            return None
+        else:
+            return "resources/main_logo.ico"
     
     def is_dup(self, id):
         self.wind.destroy()
@@ -170,10 +264,14 @@ class UI:
         else:
             self.action_id = 0
 
+    def reset_id(self):
+        self.action_id = None
+
     def start_menu(self) -> str:
         start_menu = tk.Tk()
         start_menu.geometry("300x100")
         start_menu.title("Select Directory")
+        start_menu.iconbitmap(self.find_logo())
         path = tk.StringVar()
         ent1 = tk.Entry(start_menu, font=40, textvariable=path)
         ent1.pack(side = "top", anchor = "nw", padx = 10, pady = 10)
@@ -194,7 +292,8 @@ class UI:
     def comp_wind(self, im1: str, im2: str):
         self.wind = tk.Tk()
         self.wind.geometry("1000x600")
-
+        self.wind.title("Comparison Window")
+        self.wind.iconbitmap(self.find_logo())
 
         img_data1 = Image.open(im1)
         prop1 = img_data1.size
@@ -241,33 +340,30 @@ class RunApp:
             self.folder.reduce_im()
     
     def run(self):
-        dups = []
+        self.get_path()
         self.folder.get_content()
         self.folder.det_images()
         if self.folder.ret_images() == []:
             exit()
         images = self.folder.ret_images()
-        compt = 0
-        ref = len(images)
-        while compt != ref:
-            for i in range(0, len(images)):
-                if i != compt:
-                    images[compt].size_get()
+        while len(images) != 0:
+            if images[0].exists():
+                images[0].size_get()
+                convu = self.folder.convolution(images[0])
+                dups = []
+                for i in range(1, len(images)):
+                    print(images[0].ret_name())
                     images[i].size_get()
-                    if self.folder.convolution(images[compt], images[i]):
+                    if self.folder.accurate_find(conv1 = convu, conv2 = self.folder.convolution(images[i]), img1 = images[0], img2 = images[i]):
                         dups.append(images[i])
-            compt += 1
-            self.folder.reduce_im()
-            for j in dups:
-                self.ui.comp_wind(images[compt].ret_name(), dups[j].ret_name())
-                if self.ui.action_id == 1:
-                    None
-                else:
-                    None
 
-tst = Folder()
+                if len(images) != 0:
+                    for j in dups:
+                        self.ui.comp_wind(images[0].ret_name(), j.ret_name())
+                        if self.ui.action_id == 1:
+                            os.remove(j.ret_name())
+                            self.ui.reset_id()
+            images.pop(0)
 
-i1 = File("hooh.png")
-i2 = File("zzz.png")
-
-tst.accurate_find(i1, i2)
+r = RunApp()
+r.run()
