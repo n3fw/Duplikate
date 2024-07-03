@@ -344,7 +344,7 @@ class RunApp:
         """
         :returns an approximate number of operations to complete in order to work on a folder
         """
-        return ceil(len(self.folder.ret_content())*log2(self.folder.ret_content() - 1))
+        return ceil(len(self.folder.ret_content()) * log2( len(self.folder.ret_content()) - 1 ))
     
     def run(self):
         self.get_path()
