@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import filedialog
 import ctypes as ct
 from math import log2, ceil
+import numpy as np
 
 class File:
     def __init__(self, name: str) -> None:
@@ -140,7 +141,9 @@ class Folder:
         """
         img1.pixel_list()
         tabpix = img1.ret_pixels()
-        w, h = img1.ret_size()
+        h, w = img1.ret_size()
+        print(h)
+        print(w)
         conv = [[] for i in range(0, h, 2)]
         for i in range(0, h, 2):
             for j in range(0, w, 2):
@@ -196,28 +199,31 @@ class Folder:
             dif0, dif1, dif2 = 0, 0, 0
             for i in range (len(conv1)):
                 for j in range (len(conv1[i])):
-                    if conv1[i][j][0] == 0 and conv2[i][j][0] != 0:
+                    if (conv1[i][j][0] == 0 and conv2[i][j][0] != 0) or (conv1[i][j][0] != 0 and conv2[i][j][0] == 0):
                         dif0 += 1
-                    elif conv1[i][j][0] == conv2[i][j][0] == 0:
+                    elif conv1[i][j][0] == conv2[i][j][0]:
                         pass
                     else:
-                        dif0 += (conv2[i][j][0] - conv1[i][j][0]) / conv1[i][j][0]
-                    if conv1[i][j][1] == 0 and conv2[i][j][1]:
+                        dif0 += abs(conv2[i][j][0] - conv1[i][j][0]) / conv1[i][j][0]
+
+                    if (conv1[i][j][1] == 0 and conv2[i][j][1] != 0) or (conv1[i][j][1] != 0 and conv2[i][j][1] == 0):
                         dif1 +=1
-                    elif  conv1[i][j][1] == conv2[i][j][1] == 0:
+                    elif  conv1[i][j][1] == conv2[i][j][1]:
                         pass
                     else:
-                        dif1 += (conv2[i][j][1] - conv1[i][j][1]) / conv1[i][j][1]
-                    if conv1[i][j][2] == 0 and conv2[i][j][2]:
+                        dif1 += abs(conv2[i][j][1] - conv1[i][j][1]) / conv1[i][j][1]
+
+                    if (conv1[i][j][2] == 0 and conv2[i][j][2] != 0) or (conv1[i][j][2] != 0 and conv2[i][j][2] == 0):
                         dif2 += 1
-                    elif  conv1[i][j][2] == conv2[i][j][2] == 0:
+                    elif  conv1[i][j][2] == conv2[i][j][2]:
                         pass
                     else:
-                        dif2 += (conv2[i][j][2] - conv1[i][j][2]) / conv1[i][j][2]
+                        dif2 += abs(conv2[i][j][2] - conv1[i][j][2]) / conv1[i][j][2]
+
             dif0 = (dif0 / ( len(conv1) * len(conv1[0]) ) ) * 100
             dif1 = (dif1 / ( len(conv1) * len(conv1[0]) ) ) * 100
             dif2 = (dif2 / ( len(conv1) * len(conv1[0]) ) ) * 100
-            if -5.0 < dif0 < 5.0 and -5.0 < dif1 < 5.0 and -5.0 < dif2 < 5.0:
+            if dif0 < 5.0 and dif1 < 5.0 and dif2 < 5.0:
                 res = True
         else:    
             r1, g1, b1, r2, g2, b2 = 0, 0, 0, 0, 0, 0
@@ -345,6 +351,20 @@ class RunApp:
         :returns an approximate number of operations to complete in order to work on a folder
         """
         return ceil(len(self.folder.ret_content()) * log2( len(self.folder.ret_content()) - 1 ))
+
+    def test_region(self):
+        self.folder = Folder("sample/")
+        img = "bh.jpg"
+        img_f = File(self.folder.ret_path() + img)
+        convu = self.folder.convolution(img1 = img_f)
+        convu = [row for row in convu if len(row) > 0]
+
+        arr = np.array(convu, dtype=np.float32)
+        arr = arr.astype(np.uint8)
+
+        img_res = Image.fromarray(arr, mode = 'RGB')
+        img_res.save("Test.png")
+        img_res.show()
     
     def run(self):
         self.get_path()
@@ -377,4 +397,4 @@ class RunApp:
             images.pop(0)
 
 r = RunApp()
-r.run()
+r.test_region()
