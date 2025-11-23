@@ -4,8 +4,9 @@ import os
 import tkinter as tk
 from tkinter import filedialog
 import ctypes as ct
-from math import log2, ceil
+from math import log2, ceil, dist
 import numpy as np
+import region
 
 class File:
     def __init__(self, name: str) -> None:
@@ -132,56 +133,47 @@ class Folder:
     def sum_of_t(self, t1, t2):
         return (t1[0] + t2[0], t1[1] + t2[1], t1[2] + t2[2])
 
-    def convolution(self, img1: File):
+    def convolution(self, img1: File, buffer: int):
         """
-        creates a dim2 list of kernels -> for convolution
-
-        :returns list
-        :takes a File as an argument
+        Creates a list of kernels by downsampling the image.
+        Each kernel represents a BufferxBuffer block (Buffer² pixels).
         """
         img1.pixel_list()
         tabpix = img1.ret_pixels()
-        h, w = img1.ret_size()
-        print(h)
-        print(w)
-        conv = [[] for i in range(0, h, 2)]
-        for i in range(0, h, 2):
-            for j in range(0, w, 2):
-                ker = (0, 0, 0)
+        w, h = img1.ret_size()
+
+        # step = buffer because we group Buffer×Buffer pixels
+        conv = [[] for _ in range(0, h, buffer)]
+
+        for i in range(0, h, buffer):
+            for j in range(0, w, buffer):
+
+                ker_r = 0
+                ker_g = 0
+                ker_b = 0
                 nbpi = 0
-                if i < h - 2 and j < w - 2:
-                    try:
-                        val = tabpix[i][j]
-                    except IndexError:
-                        pass
-                    else:
-                        nbpi += 1
-                        ker = self.sum_of_t(ker, tabpix[i][j])
-                    try:
-                        val = tabpix[i][j+1]
-                    except IndexError:
-                        pass
-                    else:
-                        nbpi += 1
-                        ker = self.sum_of_t(ker, tabpix[i][j+1])
-                    try:
-                        val = tabpix[i+1][j]
-                    except IndexError:
-                        pass
-                    else:
-                        nbpi += 1
-                        ker = self.sum_of_t(ker, tabpix[i+1][j])
-                    try:
-                        val = tabpix[i+1][j+1]
-                    except IndexError:
-                        pass
-                    else:
-                        nbpi +=1
-                        ker = self.sum_of_t(ker, tabpix[i+1][j+1])
-                    if nbpi != 0:
-                        ker = (ker[0] / nbpi, ker[1] / nbpi, ker[2] / nbpi)
-                    conv[int(i/2)].append(ker)
+
+                # iterate through Buffer×Buffer block (Buffer² pixels)
+                for di in range(buffer):
+                    for dj in range(buffer):
+                        y = i + di
+                        x = j + dj
+
+                        if y < h and x < w:
+                            r, g, b = tabpix[x][y]  # pixel format expected: (r,g,b)
+
+                            ker_r += int(r)
+                            ker_g += int(g)
+                            ker_b += int(b)
+                            nbpi += 1
+
+                # normalize if we collected any pixel
+                if nbpi > 0:
+                    ker = (ker_r / nbpi, ker_g / nbpi, ker_b / nbpi)
+                    conv[i // buffer].append(ker)
+
         return conv
+
 
     def reduce_im(self):
         self.__images.pop(0)
@@ -350,21 +342,68 @@ class RunApp:
         """
         :returns an approximate number of operations to complete in order to work on a folder
         """
-        return ceil(len(self.folder.ret_content()) * log2( len(self.folder.ret_content()) - 1 ))
+        return ceil(len(self.folder.ret_content()) * (log2( len(self.folder.ret_content()) ) - 1))
 
     def test_region(self):
+
+        #just convolution of an image.
         self.folder = Folder("sample/")
         img = "bh.jpg"
         img_f = File(self.folder.ret_path() + img)
-        convu = self.folder.convolution(img1 = img_f)
-        convu = [row for row in convu if len(row) > 0]
+        arr = []
+        for i in range(1):
+            convu = self.folder.convolution(img1 = img_f, buffer = 16)
+            convu = [row for row in convu if len(row) > 0]
 
-        arr = np.array(convu, dtype=np.float32)
-        arr = arr.astype(np.uint8)
+            arr = np.array(convu, dtype=np.float32)
+            arr = arr.astype(np.uint8)
+            img_res = Image.fromarray(arr, mode = 'RGB')
+            img_res.save("Test.png")
+            img_f = File("Test.png")
 
+        img_f.size_get()
+
+        regions: list[region.Region] = []
+        for i in range(len(arr)): 
+            for j in range(len(arr[i])):
+                verif = False
+                for k in range(len(regions)):
+                    if dist(arr[i][j], regions[k].avg) <= 50:
+                        regions[k].group.append((i, j))
+                        verif = True
+                        break
+                if not verif:
+                    new_rg = region.Region(img_f.ret_size())
+                    new_rg.group.append((i, j))
+                    regions.append(new_rg)
+                    regions = region.Region.avg_clrs(regions, arr)
+        
+        print(len(regions))
+        colors = np.array([
+        [255,   0,   0],   # rouge
+        [  0, 255,   0],   # vert
+        [  0,   0, 255],   # bleu
+        [255, 255,   0],   # jaune
+        [255,   0, 255],   # magenta
+        [  0, 255, 255],   # cyan
+        [255, 128,   0],   # orange
+        [128,   0, 255],   # violet
+        [  0, 128, 255],   # bleu clair
+        [128, 255,   0],   # vert clair
+        [255,   0, 128],   # rose
+        [128,   0,   0],   # rouge foncé
+        [  0, 128,   0],   # vert foncé
+        [  0,   0, 128],   # bleu foncé
+        [128, 128,   0],   # kaki
+        [  0, 128, 128]    # turquoise foncé
+        ], dtype=np.uint8)
+
+        for i in range(len(regions)):
+            for pix in regions[i].group:
+                arr[pix[0]][pix[1]] = colors[i]
+        
         img_res = Image.fromarray(arr, mode = 'RGB')
-        img_res.save("Test.png")
-        img_res.show()
+        img_res.save("Test_color.png")
     
     def run(self):
         self.get_path()
