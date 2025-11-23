@@ -344,12 +344,8 @@ class RunApp:
         """
         return ceil(len(self.folder.ret_content()) * (log2( len(self.folder.ret_content()) ) - 1))
 
-    def test_region(self):
-
-        #just convolution of an image.
-        self.folder = Folder("sample/")
-        img = "bh.jpg"
-        img_f = File(self.folder.ret_path() + img)
+    def region_det(self, name_img):
+        img_f = File(self.folder.ret_path() + name_img)
         arr = []
         for i in range(1):
             convu = self.folder.convolution(img1 = img_f, buffer = 16)
@@ -358,8 +354,8 @@ class RunApp:
             arr = np.array(convu, dtype=np.float32)
             arr = arr.astype(np.uint8)
             img_res = Image.fromarray(arr, mode = 'RGB')
-            img_res.save("Test.png")
-            img_f = File("Test.png")
+            img_res.save("temp/temp.png")
+            img_f = File("temp/temp.png")
 
         img_f.size_get()
 
@@ -378,32 +374,8 @@ class RunApp:
                     regions.append(new_rg)
                     regions = region.Region.avg_clrs(regions, arr)
         
-        print(len(regions))
-        colors = np.array([
-        [255,   0,   0],   # rouge
-        [  0, 255,   0],   # vert
-        [  0,   0, 255],   # bleu
-        [255, 255,   0],   # jaune
-        [255,   0, 255],   # magenta
-        [  0, 255, 255],   # cyan
-        [255, 128,   0],   # orange
-        [128,   0, 255],   # violet
-        [  0, 128, 255],   # bleu clair
-        [128, 255,   0],   # vert clair
-        [255,   0, 128],   # rose
-        [128,   0,   0],   # rouge foncé
-        [  0, 128,   0],   # vert foncé
-        [  0,   0, 128],   # bleu foncé
-        [128, 128,   0],   # kaki
-        [  0, 128, 128]    # turquoise foncé
-        ], dtype=np.uint8)
-
-        for i in range(len(regions)):
-            for pix in regions[i].group:
-                arr[pix[0]][pix[1]] = colors[i]
-        
-        img_res = Image.fromarray(arr, mode = 'RGB')
-        img_res.save("Test_color.png")
+        os.remove("temp/temp.png")
+        return regions
     
     def run(self):
         self.get_path()
