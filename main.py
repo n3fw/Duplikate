@@ -23,6 +23,8 @@ if __name__ == "__main__":
     elif args.A:
         mode = "A"
     else:
-        raise SystemExit("Please specify -A or -F for fast or accurate search")
+        #raise SystemExit("Please specify -A or -F for fast or accurate search")
+        mode = "A"
 
     r = utils.RunApp(mode)
+    r.run()
