@@ -131,7 +131,10 @@ class Folder:
         return duplicates
 
     def sum_of_t(self, t1, t2):
-        return (t1[0] + t2[0], t1[1] + t2[1], t1[2] + t2[2])
+        if len(t1) == 2:
+            return (t1[0] + t2[0], t1[1] + t2[1])
+        elif len(t1) == 3:
+            return (t1[0] + t2[0], t1[1] + t2[1], t1[2] + t2[2])
 
     def convolution(self, img1: File, buffer: int):
         """
@@ -160,7 +163,7 @@ class Folder:
                         x = j + dj
 
                         if y < h and x < w:
-                            r, g, b = tabpix[x][y]  # pixel format expected: (r,g,b)
+                            r, g, b = tabpix[x][y][:3]  # pixel format expected: (r,g,b)
 
                             ker_r += int(r)
                             ker_g += int(g)
@@ -236,8 +239,78 @@ class Folder:
                 res = True
         return res
     
-    def accurate_find(rg1: region.Region, rg2: region.Region):
-        None
+    def dist_center_regions(self, rg1: region.Region, rg2: region.Region):
+        center1, center2 = (0, 0), (0, 0)
+        for i in range ( len(rg1.group) if len(rg1.group) >= len(rg2.group) else len(rg2.group)):
+            if i < len(rg1.group):
+                center1 = self.sum_of_t(center1, rg1.group[i])
+            if i < len(rg2.group):
+                center2 = self.sum_of_t(center2, rg2.group[i])
+        center1 = (center1[0] / len(center1), center1[1] / len(center1))
+        center2 = (center2[0] / len(center2), center2[1] / len(center2))
+        return dist(center1, center2)
+    
+    def accurate_find(self, rgs1: list[region.Region], rgs2: list[region.Region]):
+        #penalty for the number of region behind different from one image to the other
+        rgs_nbr_pen = abs(len(rgs1) - len(rgs2)) * -0.1
+
+        # Couples making of regions
+        nbr_comp = min(len(rgs1), len(rgs2))
+        base = True if nbr_comp == len(rgs1) else False
+        couples = []
+        skip = []
+        for i in range(nbr_comp):
+            corres = 1000000
+            ind = 0
+            if base:
+                for j in range(len(rgs2)):
+                    if dist(rgs1[i].avg, rgs2[j].avg) < corres and rgs2[j] not in skip:
+                        corres = dist(rgs1[i].avg, rgs2[j].avg)
+                        ind = j
+                couples.append((rgs1[i], rgs2[ind]))
+                skip.append(rgs2[ind])
+            else:
+                for j in range(len(rgs1)):
+                    if dist(rgs2[i].avg, rgs1[j].avg) < corres and rgs1[j] not in skip:
+                        corres = dist(rgs2[i].avg, rgs1[j].avg)
+                        ind = j
+                couples.append((rgs2[i], rgs1[ind]))
+                skip.append(rgs1[ind])
+        
+        #IoU determination
+        def region_iou_normalized(rA: region.Region, rB: region.Region, resolution=256):
+            g_norm1, g_norm2 = [(pix[0]/rA.dims[0], pix[1]/rA.dims[1]) for pix in rA.group], [(pix[0]/rB.dims[0], pix[1]/rB.dims[1]) for pix in rB.group]
+            (x_max1, y_max1) = (max(pix[0] for pix in g_norm1), max(pix[1] for pix in g_norm1))
+            (x_min1, y_min1) = (min(pix[0] for pix in g_norm1), min(pix[1] for pix in g_norm1))
+            (x_max2, y_max2) = (max(pix[0] for pix in g_norm2), max(pix[1] for pix in g_norm2))
+            (x_min2, y_min2) = (min(pix[0] for pix in g_norm2), min(pix[1] for pix in g_norm2))
+            x_min_score = abs(x_min1 - x_min2)
+            y_min_score = abs(y_min1 - y_min2)
+            x_max_score = abs(x_max1 - x_max2)
+            y_max_score = abs(y_max1 - y_max2)
+            return x_min_score + x_max_score + y_min_score + y_max_score
+        
+        IoU_score = 0
+        Centroid_score = 0
+        r1, g1, b1, r2, g2, b2 = 0, 0, 0, 0, 0, 0
+        dmax = (rgs1[0].dims[0]*rgs1[0].dims[0] + rgs1[0].dims[1]*rgs1[0].dims[1])**5 if base else (rgs2[0].dims[0]*rgs2[0].dims[0] + rgs2[0].dims[1]*rgs2[0].dims[1])**5
+        for i in range(len(couples)):
+            r1 += rgs1[i].avg[0] 
+            g1 += rgs1[i].avg[1] 
+            b1 += rgs1[i].avg[2]
+            r2 += rgs2[i].avg[0] 
+            g2 += rgs2[i].avg[1] 
+            b2 += rgs2[i].avg[2] 
+            IoU_score += region_iou_normalized(couples[i][0], couples[i][1])
+            dist_center = self.dist_center_regions(couples[i][0], couples[i][1])
+            if dist_center != 0.0:
+                Centroid_score += 1 - min(dist_center/dmax, 1)
+
+        Centroid_score /= len(rgs2) if base else len(rgs1)
+        IoU_score /= nbr_comp 
+        red_score, green_score, blue_score = abs(r1 - r2) / (100*len(couples)), abs(g1 - g2) / (100*len(couples)), abs(b1 - b2) / (100*len(couples))
+        total = round((rgs_nbr_pen - Centroid_score - IoU_score - red_score - green_score - blue_score), 3)
+        return total
 
 class UI:
     def __init__(self):
@@ -318,7 +391,7 @@ class RunApp:
     def __init__(self, mode):
         self.ui = UI()
         self.folder = None
-        self.mode = ""
+        self.mode = mode
     
     def get_path(self):
         self.folder = Folder(self.ui.start_menu())
@@ -342,10 +415,10 @@ class RunApp:
         """
         :returns an approximate number of operations to complete in order to work on a folder
         """
-        return ceil(len(self.folder.ret_content()) * (log2( len(self.folder.ret_content()) ) - 1))
+        return (len(self.folder.ret_images())-1)*len(self.folder.ret_images()) // 2
 
-    def region_det(self, name_img):
-        img_f = File(self.folder.ret_path() + name_img)
+    def region_det(self, name_img) -> list[region.Region]:
+        img_f = File(name_img)
         arr = []
         for i in range(1):
             convu = self.folder.convolution(img1 = img_f, buffer = 16)
@@ -374,9 +447,10 @@ class RunApp:
                     regions.append(new_rg)
                     regions = region.Region.avg_clrs(regions, arr)
         
+        img_res.close()
         os.remove("temp/temp.png")
         return regions
-    
+
     def run(self):
         self.get_path()
         self.folder.get_content()
@@ -396,18 +470,25 @@ class RunApp:
         while len(images) != 0:
             if images[0].exists():
                 dups = []
+                dups_ind = []
                 for i in range(1, len(images)):
-                    print("treating comparison " + f"{compt}" + " out of " + f"{total}")
+                    print("treating comparison " + f"{compt}" + " out of a maximum of " + f"{total}")
                     if self.mode == "F" and self.folder.fast_find(conv1 = convs[0], conv2 = convs[i], img1 = images[0], img2 = images[i]):
                         dups.append(images[i])
-                    if self.mode == "A" and self.folder.accurate_find(rg1 = regions[0], rg2 = regions[i]):
-                        dups.append(images[i])
+                    if self.mode == "A":
+                        score = self.folder.accurate_find(rgs1 = regions[0], rgs2 = regions[i])
+                        if score > -1.0:
+                            dups.append(images[i])
+                            dups_ind.append(i)
                     compt += 1
 
                 if len(dups) != 0:
-                    for j in dups:
-                        self.ui.comp_wind(images[0].ret_name(), j.ret_name())
+                    for j in range(len(dups)):
+                        self.ui.comp_wind(images[0].ret_name(), dups[j].ret_name())
                         if self.ui.action_id == 1:
-                            os.remove(j.ret_name())
+                            os.remove(dups[j].ret_name())
+                            images.pop(dups_ind[j])
+                            regions.pop(dups_ind[j])
                             self.ui.reset_id()
             images.pop(0)
+            regions.pop(0)
