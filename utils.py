@@ -71,14 +71,14 @@ class File:
             
 class Folder:
     def __init__(self, path: str | None = None) -> None:
-        self.__path = path
-        self.__content = []
-        self.__images = []
+        self.__path: str = path
+        self.__content: list[str] = []
+        self.__images: list[File] = []
     
     def ret_content(self):
         return self.__content
     
-    def ret_images(self):
+    def ret_images(self) -> list[File]: 
         return self.__images
     
     def ret_path(self):
@@ -173,12 +173,8 @@ class Folder:
                     conv[i // buffer].append(ker)
 
         return conv
-
-
-    def reduce_im(self):
-        self.__images.pop(0)
     
-    def accurate_find(self, conv1: list, conv2: list, img1: File, img2: File):
+    def fast_find(self, conv1: list, conv2: list, img1: File, img2: File):
         """
         determines if two images are the same or not  \n
         two cases -> same size or different sizes
@@ -239,6 +235,9 @@ class Folder:
             if -5.0 < difR < 5.0 and -5.0 < difB < 5.0 and -5.0 < difG < 5.0:
                 res = True
         return res
+    
+    def accurate_find(rg1: region.Region, rg2: region.Region):
+        None
 
 class UI:
     def __init__(self):
@@ -316,9 +315,10 @@ class UI:
         self.wind.mainloop()
 
 class RunApp:
-    def __init__(self):
+    def __init__(self, mode):
         self.ui = UI()
         self.folder = None
+        self.mode = ""
     
     def get_path(self):
         self.folder = Folder(self.ui.start_menu())
@@ -387,25 +387,27 @@ class RunApp:
             ct.windll.user32.MessageBoxW(0, "No images found in the given folder !", "Error", 0)
             exit()
         images = self.folder.ret_images()
+
+        if (self.mode == "F"):
+            convs = [self.folder.convolution(im, 4) for im in images]
+        else:
+            regions = [self.region_det(im.ret_name()) for im in images]
+
         while len(images) != 0:
             if images[0].exists():
-                images[0].size_get()
-                convu = self.folder.convolution(images[0])
                 dups = []
                 for i in range(1, len(images)):
                     print("treating comparison " + f"{compt}" + " out of " + f"{total}")
-                    images[i].size_get()
-                    if self.folder.accurate_find(conv1 = convu, conv2 = self.folder.convolution(images[i]), img1 = images[0], img2 = images[i]):
+                    if self.mode == "F" and self.folder.fast_find(conv1 = convs[0], conv2 = convs[i], img1 = images[0], img2 = images[i]):
+                        dups.append(images[i])
+                    if self.mode == "A" and self.folder.accurate_find(rg1 = regions[0], rg2 = regions[i]):
                         dups.append(images[i])
                     compt += 1
 
-                if len(images) != 0:
+                if len(dups) != 0:
                     for j in dups:
                         self.ui.comp_wind(images[0].ret_name(), j.ret_name())
                         if self.ui.action_id == 1:
                             os.remove(j.ret_name())
                             self.ui.reset_id()
             images.pop(0)
-
-r = RunApp()
-r.test_region()
