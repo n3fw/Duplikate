@@ -45,7 +45,7 @@ class File:
     
     def is_image(self) -> bool:
         """
-        dtermines if a file is an image by its extension
+        determines if a file is an image by its extension
         """
         res: bool = False
         extension = pl.Path(self.__name).suffix
@@ -270,22 +270,40 @@ class UI:
 
     def start_menu(self) -> str:
         start_menu = tk.Tk()
-        start_menu.geometry("300x100")
+        start_menu.geometry("800x400")
         start_menu.title("Select Directory")
         start_menu.iconbitmap(self.find_logo())
-        path = tk.StringVar()
-        ent1 = tk.Entry(start_menu, font=40, textvariable=path)
-        ent1.pack(side = "top", anchor = "nw", padx = 10, pady = 10)
+
+        start_menu.update_idletasks()
+        x = (start_menu.winfo_screenwidth()//2)-400
+        y = (start_menu.winfo_screenheight()//2)-200
+        start_menu.geometry(f'{800}x{400}+{x}+{y}')
+
+        title = tk.Label(start_menu, text = "Welcome to our image recognition program", font = ("Times New Roman", 20, "bold"))
+        title.pack(pady=10)
+
 
         def browsefunc():
             foldername = filedialog.askdirectory()
             ent1.insert(tk.END, foldername)
 
-        browse_b = tk.Button(start_menu, text='Browse...', font = 40, command = browsefunc)
-        browse_b.place_configure(relx = 0.7, rely = 0.09)
+        browseText = tk.Label(start_menu, text = "Click here to choose the images you want to compare :", font = ("Times New Roman", 12))
+        browseText.pack(pady = 10)
+        browse_b = tk.Button(start_menu, text='Browse...', font = ("Times New Roman", 10), command = browsefunc,
+                             width = 10, height = 2)
+        browse_b.pack(pady = 2)
 
-        save_button = tk.Button(start_menu, text = "Save", font = 40, command = start_menu.destroy)
-        save_button.pack(side = "bottom", pady = 15)
+        pathText = tk.Label(start_menu, text = "URL :", font = ("Times New Roman", 12))
+        pathText.pack(pady = 2)
+        path = tk.StringVar()
+        ent1 = tk.Entry(start_menu, font=40, textvariable=path)
+        ent1.pack(side="top", anchor="center", pady=2)
+
+        saveText = tk.Label(start_menu, text="Click here to save the selected images and launch the research :", font=("Times New Roman", 12))
+        saveText.pack(pady=10)
+        save_button = tk.Button(start_menu, text = "Save", font = ("Times New Roman", 10), command = start_menu.destroy,
+                                width = 10, height = 2)
+        save_button.pack(pady = 2)
         start_menu.mainloop()
 
         return path.get()
@@ -324,7 +342,7 @@ class RunApp:
     
     def get_path(self):
         self.folder = Folder(self.ui.start_menu())
-    
+
     def pixel_by_pixel(self):
         self.folder.get_content()
         self.folder.det_images()
