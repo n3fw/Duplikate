@@ -383,26 +383,43 @@ class UI:
         self.wind.geometry("1000x600")
         self.wind.title("Comparison Window")
         self.wind.iconbitmap(self.find_logo())
+        self.wind.update_idletasks()
+        x = (self.wind.winfo_screenwidth() // 2) - 500
+        y = (self.wind.winfo_screenheight() // 2) - 300
+        self.wind.geometry(f'{1000}x{600}+{x}+{y}')
+
 
         img_data1 = Image.open(im1)
         prop1 = img_data1.size
-        img_data1 = img_data1.resize( ( round(prop1[1] / (prop1[1]/400)), round(prop1[0] / (prop1[0]/400)) ) )
+        ratio1 = 250/prop1[1]
+        width1 = int(prop1[0]*ratio1)
+        img_data1 = img_data1.resize((width1, 250))
         item1 = ImageTk.PhotoImage(img_data1)
         ImLabel1 = tk.Label(self.wind, image = item1)
 
         img_data2 = Image.open(im2)
         prop2 = img_data2.size
-        img_data2 = img_data2.resize( ( round(prop2[1] / (prop2[1]/400)), round(prop2[0] / (prop2[0]/400)) ) )
+        ratio2 = 250/prop2[1]
+        width2 = int(prop2[0]*ratio2)
+        img_data2 = img_data2.resize((width2, 250))
         item2 = ImageTk.PhotoImage(img_data2)
         ImLabel2 = tk.Label(self.wind, image = item2)
 
-        ImLabel1.place_configure(relx = 0.05, rely = 0.05)
-        ImLabel2.place_configure(relx = 0.55, rely = 0.05)
+        ImLabel1.place_configure(relx = 0.25, rely = 0.15, anchor = "n")
+        ImLabel2.place_configure(relx = 0.75, rely = 0.15, anchor = "n")
 
-        button_conf = tk.Button(self.wind, text = "Yes", font = ("Arial", 20), command = lambda: self.is_dup(id = True))
-        button_conf.place_configure(relx = 0.37, rely= 0.8)
-        button_deny = tk.Button(self.wind, text = "No", font = ("Arial", 20), command = lambda: self.is_dup(id = False))
-        button_deny.place_configure(relx = 0.6, rely = 0.8)
+        buttonText = tk.Label(text = "These two images seem to be identical.", font = ("Times New Roman", 20))
+        buttonText.pack(pady = 20)
+
+        buttonText = tk.Label(text="Do you confirm this statement ? (Answer with either yes or no) ", font=("Times New Roman", 20))
+        buttonText.place_configure(relx = 0.5, rely = 0.7, anchor = "center")
+
+        button_conf = tk.Button(self.wind, text = "Yes", font = ("Times New Roman", 20), command = lambda: self.is_dup(id = True))
+        button_conf.place_configure(relx = 0.45, rely= 0.8, anchor = "center")
+
+        button_deny = tk.Button(self.wind, text = "No", font = ("Times New Roman", 20), command = lambda: self.is_dup(id = False))
+        button_deny.place_configure(relx = 0.55, rely = 0.8, anchor = "center")
+
         self.wind.mainloop()
 
 class RunApp:
