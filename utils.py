@@ -462,6 +462,8 @@ class RunApp:
             arr = np.array(convu, dtype=np.float32)
             arr = arr.astype(np.uint8)
             img_res = Image.fromarray(arr, mode = 'RGB')
+            fol = pl.Path("temp")
+            fol.mkdir(exist_ok = True)
             img_res.save("temp/temp.png")
             img_f = File("temp/temp.png")
 
